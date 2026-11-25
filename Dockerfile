@@ -9,4 +9,4 @@ COPY main.py index.html model.pkl ./
 
 EXPOSE 8000
 
-CMD ['uvicorn','app:app','--host','--port','8000']
+CMD ["uvicorn", "main:app", "--host", "--port", "8000"]

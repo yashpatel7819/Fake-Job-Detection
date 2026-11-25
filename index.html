@@ -1,0 +1,488 @@
+!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fake Job Posting Detector</title>
+
+<style>
+  :root {
+    --bg: #f1f5f9; --card: #ffffff; --text: #0f172a; --muted: #64748b;
+    --border: #e2e8f0; --input: #f8fafc; --accent: #4f46e5; --accent2: #7c3aed;
+    --good: #16a34a; --warn: #d97706; --bad: #dc2626; --shadow: 0 8px 30px rgba(15,23,42,.08);
+  }
+  [data-theme="dark"] {
+    --bg: #0b1120; --card: #131c31; --text: #e5e9f2; --muted: #94a3b8;
+    --border: #25314d; --input: #0f1729; --accent: #818cf8; --accent2: #a78bfa;
+    --shadow: 0 8px 30px rgba(0,0,0,.4);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    transition: background .3s, color .3s;
+  }
+
+  /* ---------- header ---------- */
+  header {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff; padding: 28px 20px 70px; text-align: center; position: relative;
+  }
+  header h1 { margin: 0 0 6px; font-size: clamp(1.5rem, 4vw, 2.2rem); }
+  header p { margin: 0; opacity: .9; }
+  #themeBtn {
+    position: absolute; top: 16px; right: 16px; width: 42px; height: 42px;
+    border-radius: 50%; border: 0; cursor: pointer; font-size: 1.2rem;
+    background: rgba(255,255,255,.2); color: #fff; transition: transform .3s;
+  }
+  #themeBtn:hover { transform: rotate(25deg) scale(1.1); }
+
+  /* ---------- layout ---------- */
+  .wrap {
+    max-width: 1100px; margin: -48px auto 40px; padding: 0 16px;
+    display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start;
+  }
+  .card {
+    background: var(--card); border-radius: 16px; padding: 24px;
+    box-shadow: var(--shadow); border: 1px solid var(--border);
+    transition: background .3s, border-color .3s;
+  }
+  .side { position: sticky; top: 16px; display: grid; gap: 20px; }
+  h2 { margin: 0 0 14px; font-size: 1.05rem; }
+
+  /* ---------- quick fill ---------- */
+  .quick { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .quick span { color: var(--muted); font-size: .85rem; }
+  .pill {
+    border: 1px solid var(--border); background: var(--input); color: var(--text);
+    padding: 6px 12px; border-radius: 99px; font-size: .82rem; cursor: pointer;
+    transition: transform .15s, border-color .15s;
+  }
+  .pill:hover { transform: translateY(-2px); border-color: var(--accent); }
+
+  /* ---------- progress ---------- */
+  .progress { height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; margin: 10px 0 4px; }
+  .progress i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .3s; }
+  .progress-label { font-size: .78rem; color: var(--muted); }
+
+  /* ---------- fields ---------- */
+  .field { position: relative; margin-top: 16px; }
+  .field > label { display: block; margin-bottom: 6px; font-weight: 600; font-size: .88rem; }
+  input[type="text"], textarea, select {
+    width: 100%; padding: 11px 13px; font: inherit; color: var(--text);
+    background: var(--input); border: 1px solid var(--border); border-radius: 10px;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  input:focus, textarea:focus, select:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  textarea { min-height: 84px; resize: vertical; }
+  .count { position: absolute; right: 10px; bottom: 8px; font-size: .72rem; color: var(--muted); pointer-events: none; }
+  .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+  /* ---------- toggle switches ---------- */
+  .toggles { display: grid; gap: 10px; margin-top: 18px; }
+  .toggle { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--input); cursor: pointer; font-size: .9rem; }
+  .toggle input { display: none; }
+  .switch { width: 42px; height: 24px; border-radius: 99px; background: var(--border); position: relative; transition: background .25s; flex-shrink: 0; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .25s; }
+  .toggle input:checked + .switch { background: var(--accent); }
+  .toggle input:checked + .switch::after { transform: translateX(18px); }
+
+  /* ---------- buttons ---------- */
+  .actions { display: flex; gap: 10px; margin-top: 22px; }
+  .btn { padding: 13px 18px; border: 0; border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer; transition: transform .15s, opacity .2s; }
+  .btn:hover { transform: translateY(-2px); }
+  .btn:active { transform: translateY(0); }
+  .btn.primary { flex: 1; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+  .btn.ghost { background: var(--input); color: var(--text); border: 1px solid var(--border); }
+  .btn:disabled { opacity: .6; cursor: wait; transform: none; }
+  .hint { margin-top: 8px; font-size: .75rem; color: var(--muted); text-align: center; }
+  kbd { background: var(--input); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: .72rem; }
+
+  /* ---------- result ---------- */
+  .placeholder { text-align: center; color: var(--muted); padding: 20px 0; }
+  .placeholder .big { font-size: 2.6rem; }
+  .gauge { width: 100%; max-width: 280px; margin: 0 auto; display: block; }
+  .gauge .track { fill: none; stroke: var(--border); stroke-width: 16; stroke-linecap: round; }
+  .gauge .fill { fill: none; stroke-width: 16; stroke-linecap: round; stroke-dasharray: 251.33; stroke-dashoffset: 251.33; transition: stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1), stroke .4s; }
+  .gauge text { fill: var(--text); text-anchor: middle; }
+  .verdict { text-align: center; font-size: 1.35rem; font-weight: 700; margin-top: 4px; }
+  .verdict.good { color: var(--good); } .verdict.bad { color: var(--bad); }
+  .verdict-sub { text-align: center; color: var(--muted); font-size: .85rem; margin-top: 4px; }
+  .pop { animation: pop .5s cubic-bezier(.22,1.6,.36,1); }
+  @keyframes pop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .shake { animation: shake .5s; }
+  @keyframes shake { 20%,60% { transform: translateX(-6px);} 40%,80% { transform: translateX(6px);} }
+  .error { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); padding: 14px; border-radius: 10px; text-align: center; }
+
+  .spinner { width: 46px; height: 46px; margin: 28px auto 10px; border: 5px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { text-align: center; color: var(--muted); padding-bottom: 20px; }
+
+  /* ---------- red flags ---------- */
+  .flags { display: flex; flex-wrap: wrap; gap: 8px; min-height: 30px; }
+  .flag { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); border-radius: 99px; padding: 5px 11px; font-size: .78rem; font-weight: 600; animation: pop .35s; }
+  .flag.ok { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+  .note { font-size: .74rem; color: var(--muted); margin: 10px 0 0; }
+
+  /* ---------- history ---------- */
+  .history { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 240px; overflow: auto; }
+  .history li { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 9px 12px; background: var(--input); border: 1px solid var(--border); border-radius: 10px; font-size: .85rem; animation: pop .3s; }
+  .history .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { font-weight: 700; font-size: .75rem; padding: 3px 9px; border-radius: 99px; flex-shrink: 0; }
+  .badge.fake { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); }
+  .badge.real { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+  .empty { color: var(--muted); font-size: .85rem; text-align: center; padding: 8px; }
+  .link { background: none; border: 0; color: var(--muted); font-size: .75rem; cursor: pointer; text-decoration: underline; float: right; }
+
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } .side { position: static; } }
+  @media (max-width: 520px) { .row { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+
+<body>
+<canvas id="confetti"></canvas>
+
+<header>
+  <button id="themeBtn" title="Toggle dark mode" aria-label="Toggle dark mode">🌙</button>
+  <h1>🕵️ Fake Job Posting Detector</h1>
+  <p>Paste a job ad and let the model sniff out scams.</p>
+</header>
+
+<main class="wrap">
+  <!-- ================= FORM ================= -->
+  <section class="card">
+    <div class="quick">
+      <span>Try an example:</span>
+      <button type="button" class="pill" data-example="real">✅ Genuine job</button>
+      <button type="button" class="pill" data-example="fake">🚩 Suspicious job</button>
+    </div>
+
+    <div class="progress"><i id="progressBar"></i></div>
+    <div class="progress-label" id="progressLabel">0% complete</div>
+
+    <form id="jobForm" autocomplete="off">
+      <div class="field">
+        <label for="title">Job title *</label>
+        <input type="text" id="title" required maxlength="120" placeholder="e.g. Data Entry Clerk">
+        <span class="count" data-for="title"></span>
+      </div>
+
+      <div class="field">
+        <label for="company_profile">Company profile</label>
+        <textarea id="company_profile" maxlength="2000" placeholder="About the company..."></textarea>
+        <span class="count" data-for="company_profile"></span>
+      </div>
+
+      <div class="field">
+        <label for="description">Description</label>
+        <textarea id="description" maxlength="4000" placeholder="What will the person do?"></textarea>
+        <span class="count" data-for="description"></span>
+      </div>
+
+      <div class="field">
+        <label for="requirements">Requirements</label>
+        <textarea id="requirements" maxlength="3000" placeholder="Skills, experience, qualifications..."></textarea>
+        <span class="count" data-for="requirements"></span>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="employment_type">Employment type</label>
+          <select id="employment_type">
+            <option>Unknown</option><option>Full-time</option><option>Part-time</option>
+            <option>Contract</option><option>Temporary</option><option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="required_experience">Experience</label>
+          <select id="required_experience">
+            <option>Unknown</option><option>Internship</option><option>Entry level</option>
+            <option>Associate</option><option>Mid-Senior level</option><option>Director</option>
+            <option>Executive</option><option>Not Applicable</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="required_education">Education</label>
+          <select id="required_education">
+            <option>Unknown</option><option>High School or equivalent</option>
+            <option>Some College Coursework Completed</option><option>Associate Degree</option>
+            <option>Bachelor's Degree</option><option>Master's Degree</option>
+            <option>Doctorate</option><option>Unspecified</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="toggles">
+        <label class="toggle">🏠 Remote / telecommuting <input type="checkbox" id="telecommuting"><span class="switch"></span></label>
+        <label class="toggle">🖼️ Company logo included <input type="checkbox" id="has_company_logo"><span class="switch"></span></label>
+        <label class="toggle">❓ Has screening questions <input type="checkbox" id="has_questions"><span class="switch"></span></label>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn ghost" id="resetBtn">Reset</button>
+        <button type="submit" class="btn primary" id="submitBtn">🔍 Check posting</button>
+      </div>
+      <div class="hint">Tip: press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to submit</div>
+    </form>
+  </section>
+
+  <!-- ================= SIDE PANEL ================= -->
+  <aside class="side">
+    <section class="card" aria-live="polite">
+      <h2>Result</h2>
+      <div id="result">
+        <div class="placeholder">
+          <div class="big">🔎</div>
+          <div>Fill in the form and hit <b>Check posting</b>.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Live red-flag scanner</h2>
+      <div class="flags" id="flags"><span class="flag ok">Start typing to scan…</span></div>
+      <p class="note">Quick keyword hints that run in your browser as you type. They are not the model's verdict.</p>
+    </section>
+
+    <section class="card">
+      <h2>Recent checks <button class="link" id="clearHistory">clear</button></h2>
+      <ul class="history" id="history"></ul>
+    </section>
+  </aside>
+</main>
+
+<script>
+/* ============ helpers ============ */
+const $ = id => document.getElementById(id);
+const textIds = ["title", "company_profile", "description", "requirements"];
+const selectIds = ["employment_type", "required_experience", "required_education"];
+const checkIds = ["telecommuting", "has_company_logo", "has_questions"];
+
+/* ============ examples ============ */
+const EXAMPLES = {
+  real: {
+    title: "Senior Backend Engineer",
+    company_profile: "Northwind Analytics is a 200-person software company building data tools for logistics teams, with offices in Pune and Berlin.",
+    description: "Join our platform team to design and maintain Python services that process millions of events a day. You will work with product managers and data scientists, review code, and mentor junior engineers.",
+    requirements: "5+ years of backend experience, strong Python and SQL, familiarity with AWS, and good communication skills.",
+    employment_type: "Full-time", required_experience: "Mid-Senior level", required_education: "Bachelor's Degree",
+    telecommuting: false, has_company_logo: true, has_questions: true
+  },
+  fake: {
+    title: "Work From Home Data Entry - Earn $5000/week",
+    company_profile: "",
+    description: "URGENT hiring! No experience needed. Earn money fast from home. Send your bank details and a small processing fee to get started. Payment by wire transfer. Contact us on WhatsApp or gmail.",
+    requirements: "Must have a computer and be available immediately.",
+    employment_type: "Unknown", required_experience: "Unknown", required_education: "Unknown",
+    telecommuting: true, has_company_logo: false, has_questions: false
+  }
+};
+
+function fillExample(key) {
+  const ex = EXAMPLES[key];
+  [...textIds, ...selectIds].forEach(id => $(id).value = ex[id]);
+  checkIds.forEach(id => $(id).checked = ex[id]);
+  refreshUI();
+}
+
+document.querySelectorAll("[data-example]").forEach(b =>
+  b.addEventListener("click", () => fillExample(b.dataset.example)));
+
+/* ============ theme ============ */
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  $("themeBtn").textContent = t === "dark" ? "☀️" : "🌙";
+  try { localStorage.setItem("theme", t); } catch (e) {}
+}
+let saved = null;
+try { saved = localStorage.getItem("theme"); } catch (e) {}
+setTheme(saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+$("themeBtn").addEventListener("click", () =>
+  setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+
+/* ============ progress, counters, red flags ============ */
+const FLAG_RULES = [
+  { re: /wire transfer|western union|money ?gram|gift card|crypto(currency)? payment/i, label: "💸 Unusual payment method" },
+  { re: /processing fee|registration fee|training fee|pay (a|the) fee|deposit/i, label: "💰 Asks for upfront fee" },
+  { re: /bank (details|account)|ssn|social security|passport/i, label: "🏦 Asks for sensitive info" },
+  { re: /no experience (needed|required)|anyone can|easy money|guaranteed income/i, label: "🎣 Too-good-to-be-true" },
+  { re: /\$\s?\d{3,}\s?(\/|per|a)\s?(day|week)/i, label: "🤑 Unrealistic pay claim" },
+  { re: /urgent|immediate(ly)? start|act now|limited slots/i, label: "⏰ Pressure / urgency" },
+  { re: /whatsapp|telegram|@gmail\.|@yahoo\.|@outlook\./i, label: "📱 Informal contact channel" },
+];
+
+function scanFlags() {
+  const all = textIds.map(id => $(id).value).join(" ");
+  const box = $("flags");
+  box.innerHTML = "";
+  if (!all.trim()) { box.innerHTML = '<span class="flag ok">Start typing to scan…</span>'; return; }
+  const hits = FLAG_RULES.filter(r => r.re.test(all));
+  if (!$("company_profile").value.trim()) hits.push({ label: "🏢 No company profile" });
+  if (!hits.length) { box.innerHTML = '<span class="flag ok">✓ No obvious red flags</span>'; return; }
+  hits.forEach(h => {
+    const s = document.createElement("span");
+    s.className = "flag"; s.textContent = h.label; box.appendChild(s);
+  });
+}
+
+function updateProgress() {
+  const filled = textIds.filter(id => $(id).value.trim()).length;
+  const picked = selectIds.filter(id => $(id).value !== "Unknown").length;
+  const pct = Math.round(((filled + picked) / (textIds.length + selectIds.length)) * 100);
+  $("progressBar").style.width = pct + "%";
+  $("progressLabel").textContent = pct + "% complete — more detail gives a better prediction";
+}
+
+function updateCounts() {
+  document.querySelectorAll(".count").forEach(c => {
+    const el = $(c.dataset.for);
+    c.textContent = el.value.length ? `${el.value.length}/${el.maxLength}` : "";
+  });
+}
+
+function refreshUI() { updateProgress(); updateCounts(); scanFlags(); }
+[...textIds, ...selectIds].forEach(id => $(id).addEventListener("input", refreshUI));
+refreshUI();
+
+/* ============ result rendering ============ */
+function gaugeColor(p) {
+  return p < 0.3 ? "var(--good)" : p < 0.6 ? "var(--warn)" : "var(--bad)";
+}
+
+function showLoading() {
+  $("result").innerHTML = '<div class="spinner"></div><div class="loading-text" id="lt">Reading the posting…</div>';
+  const msgs = ["Reading the posting…", "Counting suspicious words…", "Asking the model…"];
+  let i = 0;
+  window._lt = setInterval(() => { const el = $("lt"); if (el) el.textContent = msgs[++i % msgs.length]; }, 700);
+}
+
+function showResult(data) {
+  clearInterval(window._lt);
+  const p = data.fraud_probability;
+  const fake = data.prediction === "Fake";
+  $("result").innerHTML = `
+    <svg class="gauge ${fake ? "shake" : "pop"}" viewBox="0 0 200 120" role="img" aria-label="Fraud probability gauge">
+      <path class="track" d="M 20 100 A 80 80 0 0 1 180 100"/>
+      <path class="fill" id="gaugeFill" d="M 20 100 A 80 80 0 0 1 180 100" style="stroke:${gaugeColor(p)}"/>
+      <text id="gaugeNum" x="100" y="92" font-size="30" font-weight="700">0%</text>
+      <text x="100" y="112" font-size="10" opacity=".6">fraud probability</text>
+    </svg>
+    <div class="verdict ${fake ? "bad" : "good"} pop">${fake ? "⚠️ Likely FAKE" : "✅ Looks REAL"}</div>
+    <div class="verdict-sub">${fake ? "Be careful — don't share personal or payment details." : "No strong scam signals, but always verify the employer."}</div>`;
+
+  // animate gauge + count-up number
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    $("gaugeFill").style.strokeDashoffset = 251.33 * (1 - p);
+  }));
+  const start = performance.now(), dur = 1200;
+  (function tick(now) {
+    const t = Math.min((now - start) / dur, 1), e = 1 - Math.pow(1 - t, 3);
+    $("gaugeNum").textContent = (p * 100 * e).toFixed(1) + "%";
+    if (t < 1) requestAnimationFrame(tick);
+  })(start);
+
+  if (!fake) confetti();
+}
+
+function showError(msg) {
+  clearInterval(window._lt);
+  $("result").innerHTML = `<div class="error shake">⚠️ Could not get a prediction.<br><small>${msg}</small></div>`;
+}
+
+/* ============ history ============ */
+let history = [];
+try { history = JSON.parse(localStorage.getItem("history") || "[]"); } catch (e) {}
+
+function renderHistory() {
+  const ul = $("history");
+  ul.innerHTML = "";
+  if (!history.length) { ul.innerHTML = '<li class="empty" style="justify-content:center">Nothing yet</li>'; return; }
+  history.forEach(h => {
+    const li = document.createElement("li");
+    const t = document.createElement("span"); t.className = "t"; t.textContent = h.title;
+    const b = document.createElement("span");
+    b.className = "badge " + (h.fake ? "fake" : "real");
+    b.textContent = `${h.fake ? "Fake" : "Real"} · ${(h.p * 100).toFixed(0)}%`;
+    li.append(t, b); ul.appendChild(li);
+  });
+}
+function pushHistory(title, fake, p) {
+  history.unshift({ title, fake, p });
+  history = history.slice(0, 8);
+  try { localStorage.setItem("history", JSON.stringify(history)); } catch (e) {}
+  renderHistory();
+}
+$("clearHistory").addEventListener("click", () => {
+  history = []; try { localStorage.removeItem("history"); } catch (e) {} renderHistory();
+});
+renderHistory();
+
+/* ============ confetti (for "Real" results) ============ */
+function confetti() {
+  const cv = $("confetti"), ctx = cv.getContext("2d");
+  cv.width = innerWidth; cv.height = innerHeight;
+  const colors = ["#4f46e5", "#7c3aed", "#16a34a", "#f59e0b", "#06b6d4"];
+  const bits = Array.from({ length: 90 }, () => ({
+    x: innerWidth / 2, y: innerHeight / 3,
+    vx: (Math.random() - .5) * 14, vy: Math.random() * -12 - 2,
+    s: Math.random() * 7 + 3, c: colors[Math.random() * colors.length | 0], r: Math.random() * 6
+  }));
+  let frames = 0;
+  (function draw() {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    bits.forEach(b => {
+      b.x += b.vx; b.y += b.vy; b.vy += .35; b.r += .15;
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.r);
+      ctx.fillStyle = b.c; ctx.fillRect(-b.s / 2, -b.s / 2, b.s, b.s * .6); ctx.restore();
+    });
+    if (++frames < 110) requestAnimationFrame(draw); else ctx.clearRect(0, 0, cv.width, cv.height);
+  })();
+}
+
+/* ============ submit ============ */
+const form = $("jobForm"), btn = $("submitBtn");
+
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  const payload = {};
+  [...textIds, ...selectIds].forEach(id => payload[id] = $(id).value.trim());
+  checkIds.forEach(id => payload[id] = $(id).checked ? 1 : 0);
+
+  btn.disabled = true; btn.textContent = "Analyzing…";
+  showLoading();
+
+  try {
+    const res = await fetch("/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error("Server returned " + res.status);
+    const data = await res.json();
+    showResult(data);
+    pushHistory(payload.title, data.prediction === "Fake", data.fraud_probability);
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "🔍 Check posting";
+  }
+});
+
+$("resetBtn").addEventListener("click", () => {
+  form.reset(); refreshUI();
+  $("result").innerHTML = '<div class="placeholder"><div class="big">🔎</div><div>Fill in the form and hit <b>Check posting</b>.</div></div>';
+});
+
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") form.requestSubmit();
+});
+</script>
+</body>
+</html>
